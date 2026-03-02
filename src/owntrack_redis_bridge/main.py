@@ -31,9 +31,19 @@ async def process_messages(client: aiomqtt.Client, redis: aioredis.Redis) -> Non
 
         parts = str(message.topic).split("/")
         user = parts[1]
-        key = f"owntracks:{user}"
-        await redis.set(key, message.payload)
-        log.info("Stored %s lat=%s lon=%s", key, payload.get("lat"), payload.get("lon"))
+        device = parts[2]
+        record = {
+            "driver": user,
+            "trip_id": device,
+            "lat": payload.get("lat"),
+            "lon": payload.get("lon"),
+            "bearing": payload.get("cog"),
+            "speed": round(payload["vel"] / 3.6, 4) if payload.get("vel") is not None else None,
+            "timestamp": payload.get("tst"),
+        }
+        key = f"vehicle:{user}"
+        await redis.setex(key, 60, json.dumps(record))
+        log.info("Stored %s lat=%s lon=%s trip_id=%s", key, record["lat"], record["lon"], device)
 
 
 async def main() -> None:
