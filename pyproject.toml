@@ -7,6 +7,19 @@ dependencies = [
     "redis[hiredis]>=5.2",
 ]
 
+[dependency-groups]
+dev = [
+    "commitizen",
+    "pre-commit",
+]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_provider = "uv"
+update_changelog_on_bump = true
+major_version_zero = true
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
