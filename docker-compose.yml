@@ -1,21 +1,9 @@
 services:
-  nanomq:
-    image: emqx/nanomq:latest
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      - "1883:1883"
-    volumes:
-      - ./nanomq.conf:/etc/nanomq.conf
-
   bridge:
     build: .
     restart: on-failure
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      MQTT_BROKER: tcp://nanomq:1883
+      MQTT_BROKER: tcp://host.docker.internal:1883
       REDIS_URL: redis://host.docker.internal:6379/1
-    depends_on:
-      nanomq:
-        condition: service_started

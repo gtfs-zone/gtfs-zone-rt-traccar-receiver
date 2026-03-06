@@ -8,7 +8,7 @@ Part of a larger stack; see [deploy-gtfs-rt](https://git.kcfam.us/gtfs.zone/depl
 
 ```
 OwnTracks app (phone)
-    └─> NanoMQ (MQTT broker, bundled)
+    └─> MQTT broker (see redis-gtfs-rt-api)
             └─> bridge service
                     └─> Redis (vehicle:{username} keys, 60s TTL)
                             └─> redis-gtfs-rt-api (serves GTFS-RT feeds)
@@ -33,21 +33,11 @@ OwnTracks fields are mapped as follows:
 
 ---
 
-## NanoMQ broker
-
-The included `docker-compose.yml` runs a [NanoMQ](https://nanomq.io/) MQTT broker alongside the bridge. Anonymous connections are disabled; authentication is delegated via HTTP POST to `http://host.docker.internal:8000/mqtt/auth` (implemented by [redis-gtfs-rt-api](https://git.kcfam.us/gtfs.zone/redis-gtfs-rt-api)).
-
-ACL rules:
-- Users may only **publish** to `owntracks/{their_username}/#`
-- All clients may **subscribe** to `owntracks/#`
-
----
-
 ## Environment variables
 
 | Variable | Example | Description |
 |---|---|---|
-| `MQTT_BROKER` | `tcp://nanomq:1883` | MQTT broker URL (tcp scheme) |
+| `MQTT_BROKER` | `tcp://localhost:1883` | MQTT broker URL (tcp scheme) |
 | `REDIS_URL` | `redis://redis:6379/1` | Redis connection URL including DB number |
 
 Both are required — the service exits with `KeyError` if either is missing.
@@ -60,11 +50,14 @@ Both are required — the service exits with `KeyError` if either is missing.
 # Install dependencies (Python 3.13, uv)
 uv sync
 
+# Install git hooks (required once per clone)
+uv run pre-commit install
+
 # Run locally (requires MQTT broker and Redis)
 MQTT_BROKER=tcp://localhost:1883 REDIS_URL=redis://localhost:6379/1 \
   uv run python -m owntrack_redis_bridge.main
 
-# Run full stack (NanoMQ + bridge); Redis must be accessible at host.docker.internal:6379
+# Run bridge; MQTT broker and Redis must be accessible at host.docker.internal
 docker compose up --build
 ```
 
