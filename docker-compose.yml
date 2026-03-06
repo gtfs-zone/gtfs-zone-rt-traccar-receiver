@@ -1,15 +1,12 @@
 services:
   nanomq:
     image: emqx/nanomq:latest
-    environment:
-      NANOMQ_CONF_PATH: /etc/nanomq/nanomq.conf
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "1883:1883"
     volumes:
-      - ./nanomq.conf:/etc/nanomq/nanomq.conf
-      - ./nanomq_acl.conf:/etc/nanomq/nanomq_acl.conf
+      - ./nanomq.conf:/etc/nanomq.conf
 
   bridge:
     build: .
