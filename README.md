@@ -1,4 +1,4 @@
-# owntrack-redis-bridge
+# vehicle-poser
 
 Tiny async Python service that ingests [OwnTracks](https://owntracks.org/) location events via MQTT and writes normalized vehicle positions to Redis.
 
@@ -55,7 +55,7 @@ uv run pre-commit install
 
 # Run locally (requires MQTT broker and Redis)
 MQTT_BROKER=tcp://localhost:1883 REDIS_URL=redis://localhost:6379/1 \
-  uv run python -m owntrack_redis_bridge.main
+  uv run python -m vehicle_poser.main
 
 # Run bridge; MQTT broker and Redis must be accessible at host.docker.internal
 docker compose up --build

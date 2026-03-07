@@ -17,4 +17,4 @@ COPY --from=builder /app/src /app/src
 ENV PATH="/app/.venv/bin:$PATH"
 RUN addgroup -S bridge && adduser -S bridge -G bridge
 USER bridge
-CMD ["python", "-m", "owntrack_redis_bridge.main"]
+CMD ["python", "-m", "vehicle_poser.main"]

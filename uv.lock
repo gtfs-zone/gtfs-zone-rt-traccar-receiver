@@ -274,7 +274,7 @@ wheels = [
 ]
 
 [[package]]
-name = "owntrack-redis-bridge"
+name = "vehicle-poser"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Tiny async Python service that bridges OwnTracks MQTT location events to Redis. The entire service logic lives in `src/owntrack_redis_bridge/main.py`.
+Tiny async Python service that bridges OwnTracks MQTT location events to Redis. The entire service logic lives in `src/vehicle_poser/main.py`.
 
 ## Architecture
 
@@ -45,10 +45,10 @@ uv sync
 uv run pre-commit install
 
 # Run the service locally (requires MQTT broker and Redis)
-uv run python -m owntrack_redis_bridge.main
+uv run python -m vehicle_poser.main
 
 # Build Docker image
-docker build -t owntrack-redis-bridge .
+docker build -t vehicle-poser .
 
 # Run bridge
 docker compose up
