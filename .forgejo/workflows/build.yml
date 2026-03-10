@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -29,6 +31,9 @@ jobs:
         run: |
           SHA=$(git rev-parse --short HEAD)
           IMAGE=git.kcfam.us/gtfs.zone/vehicle-poser
-          docker build -t $IMAGE:$SHA -t $IMAGE:latest .
-          docker push $IMAGE:$SHA
-          docker push $IMAGE:latest
+          TAGS="-t $IMAGE:$SHA -t $IMAGE:latest"
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAGS="$TAGS -t $IMAGE:${{ github.ref_name }}"
+          fi
+          docker build $TAGS .
+          docker push --all-tags $IMAGE
