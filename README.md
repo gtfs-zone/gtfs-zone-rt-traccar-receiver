@@ -8,10 +8,10 @@ Part of a larger stack; see [deploy-gtfs-rt](https://git.kcfam.us/gtfs.zone/depl
 
 ```
 OwnTracks app (phone)
-    └─> MQTT broker (see redis-gtfs-rt-api)
+    └─> MQTT broker (see cafe-car)
             └─> bridge service
                     └─> Redis (vehicle:{username} keys, 60s TTL)
-                            └─> redis-gtfs-rt-api (serves GTFS-RT feeds)
+                            └─> cafe-car (serves GTFS-RT feeds)
 ```
 
 The bridge subscribes to `owntracks/+/+`, filters for `_type=location` events, transforms the payload to a normalized record, and writes it to Redis with a 60-second TTL. If the MQTT connection drops, it reconnects with exponential backoff (1s → 60s max).
