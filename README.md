@@ -57,8 +57,8 @@ uv run pre-commit install
 MQTT_BROKER=tcp://localhost:1883 REDIS_URL=redis://localhost:6379/1 \
   uv run python -m vehicle_poser.main
 
-# Run bridge; MQTT broker and Redis must be accessible at host.docker.internal
-docker compose up --build
+# Build and push Docker image (requires clean, pushed git state)
+make push
 ```
 
 ---

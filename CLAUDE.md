@@ -47,11 +47,8 @@ uv run pre-commit install
 # Run the service locally (requires MQTT broker and Redis)
 uv run python -m vehicle_poser.main
 
-# Build Docker image
-docker build -t vehicle-poser .
-
-# Run bridge
-docker compose up
+# Build and push Docker image (requires clean, pushed git state)
+make push
 ```
 
 ## Testing
