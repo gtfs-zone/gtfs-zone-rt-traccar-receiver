@@ -14,9 +14,9 @@ jobs:
         run: apk add --no-cache docker-cli git nodejs
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
-          server-url: https://git.kcfam.us
+          github-server-url: https://git.kcfam.us
 
       - name: Login to registry
         run: |
