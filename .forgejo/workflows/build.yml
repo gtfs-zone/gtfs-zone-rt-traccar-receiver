@@ -1,5 +1,12 @@
 name: Build
 
+# Requires:
+#   Variables (Settings → Variables → Actions):
+#     REGISTRY_DOMAIN  - hostname of the container registry, e.g. git.kcfam.us
+#     REGISTRY_USER    - username to authenticate with the registry, e.g. maxtkc
+#   Secrets (Settings → Secrets → Actions):
+#     REGISTRY_TOKEN   - access token with write:packages scope
+
 on:
   push:
     branches:
@@ -18,19 +25,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          github-server-url: https://git.kcfam.us
+          github-server-url: https://${{ vars.REGISTRY_DOMAIN }}
 
       - name: Login to registry
         run: |
           echo "${{ secrets.REGISTRY_TOKEN }}" | \
-            docker login git.kcfam.us -u maxtkc --password-stdin
+            docker login ${{ vars.REGISTRY_DOMAIN }} -u ${{ vars.REGISTRY_USER }} --password-stdin
 
       - name: Build and push
         env:
           DOCKER_BUILDKIT: "1"
         run: |
           SHA=$(git rev-parse --short HEAD)
-          IMAGE=git.kcfam.us/gtfs.zone/vehicle-poser
+          IMAGE=${{ vars.REGISTRY_DOMAIN }}/${{ github.repository }}
           TAGS="-t $IMAGE:$SHA -t $IMAGE:latest"
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             TAGS="$TAGS -t $IMAGE:${{ github.ref_name }}"
