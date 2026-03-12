@@ -11,6 +11,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 MQTT_BROKER = os.environ["MQTT_BROKER"]
+MQTT_USERNAME = os.environ.get("MQTT_USERNAME")
+MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD")
 REDIS_URL = os.environ["REDIS_URL"]
 
 RECONNECT_DELAY_INITIAL = 1
@@ -41,7 +43,7 @@ async def process_messages(client: aiomqtt.Client, redis: aioredis.Redis) -> Non
             "speed": round(payload["vel"] / 3.6, 4) if payload.get("vel") is not None else None,
             "timestamp": payload.get("tst"),
         }
-        key = f"vehicle:{user}"
+        key = f"vehicle:{user}:{device}"
         await redis.setex(key, 60, json.dumps(record))
         log.info("Stored %s lat=%s lon=%s trip_id=%s", key, record["lat"], record["lon"], device)
 
@@ -56,7 +58,7 @@ async def main() -> None:
 
     while True:
         try:
-            async with aiomqtt.Client(hostname=host, port=port) as client:
+            async with aiomqtt.Client(hostname=host, port=port, username=MQTT_USERNAME, password=MQTT_PASSWORD) as client:
                 log.info("Connected to MQTT broker %s:%s", host, port)
                 delay = RECONNECT_DELAY_INITIAL
                 await process_messages(client, redis)
