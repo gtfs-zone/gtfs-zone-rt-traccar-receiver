@@ -51,6 +51,10 @@ uv run python -m vehicle_poser.main
 make push
 ```
 
+## Rules
+
+- Never add Co-Authored-By trailers to commit messages.
+
 ## Testing
 
 ```sh
