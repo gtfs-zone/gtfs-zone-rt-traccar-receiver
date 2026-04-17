@@ -30,6 +30,10 @@ COPY --from=builder /app/src /app/src
 
 ENV PATH="/app/.venv/bin:$PATH"
 
+
+RUN mkdir -p /app/beat && chown bridge:bridge /app/beat
+
+
 USER bridge
 
 
