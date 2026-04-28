@@ -2,6 +2,7 @@
 name = "vehicle-poser"
 version = "0.1.1"
 requires-python = ">=3.13"
+description = "Bridges OwnTracks MQTT location events to Redis"
 dependencies = [
     "aiomqtt>=2.3",
     "redis[hiredis]>=5.2",
@@ -11,7 +12,22 @@ dependencies = [
 dev = [
     "commitizen",
     "pre-commit",
+    "ruff",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vehicle_poser"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "TCH", "RUF"]
 
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -19,7 +35,3 @@ tag_format = "v$version"
 version_provider = "uv"
 update_changelog_on_bump = true
 major_version_zero = true
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
