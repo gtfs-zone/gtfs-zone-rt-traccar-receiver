@@ -5,8 +5,14 @@ requires-python = ">=3.13"
 description = "Bridges OwnTracks MQTT location events to Redis"
 dependencies = [
     "aiomqtt>=2.3",
+    "psycopg2-binary>=2.9",
     "redis[hiredis]>=5.2",
+    "sqlmodel>=0.0.21",
+    "railroad-club",
 ]
+
+[tool.uv.sources]
+railroad-club = { git = "https://git.kcfam.us/gtfs.zone/railroad-club.git" }
 
 [dependency-groups]
 dev = [

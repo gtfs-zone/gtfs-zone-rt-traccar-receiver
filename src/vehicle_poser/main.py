@@ -6,6 +6,9 @@ from urllib.parse import urlparse
 
 import aiomqtt
 import redis.asyncio as aioredis
+from sqlmodel import Session, create_engine
+
+from railroad_club.trip_resolver import resolve_driver_trip
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -14,9 +17,17 @@ MQTT_BROKER = os.environ["MQTT_BROKER"]
 MQTT_USERNAME = os.environ.get("MQTT_USERNAME")
 MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD")
 REDIS_URL = os.environ["REDIS_URL"]
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 RECONNECT_DELAY_INITIAL = 1
 RECONNECT_DELAY_MAX = 60
+
+_engine = create_engine(DATABASE_URL)
+
+
+def _resolve_trip(username: str) -> str | None:
+    with Session(_engine) as session:
+        return resolve_driver_trip(username, session)
 
 
 async def process_messages(client: aiomqtt.Client, redis: aioredis.Redis) -> None:
@@ -34,9 +45,17 @@ async def process_messages(client: aiomqtt.Client, redis: aioredis.Redis) -> Non
         parts = str(message.topic).split("/")
         user = parts[1]
         device = parts[2]
+
+        if device == "auto":
+            trip_id = await asyncio.to_thread(_resolve_trip, user)
+            if trip_id is None:
+                log.warning("No active rule for driver=%s (device=auto)", user)
+        else:
+            trip_id = device
+
         record = {
             "driver": user,
-            "trip_id": device,
+            "trip_id": trip_id,
             "lat": payload.get("lat"),
             "lon": payload.get("lon"),
             "bearing": payload.get("cog"),
@@ -45,7 +64,7 @@ async def process_messages(client: aiomqtt.Client, redis: aioredis.Redis) -> Non
         }
         key = f"vehicle:{user}:{device}"
         await redis.setex(key, 60, json.dumps(record))
-        log.info("Stored %s lat=%s lon=%s trip_id=%s", key, record["lat"], record["lon"], device)
+        log.info("Stored %s lat=%s lon=%s trip_id=%s", key, record["lat"], record["lon"], trip_id)
 
 
 async def main() -> None:
