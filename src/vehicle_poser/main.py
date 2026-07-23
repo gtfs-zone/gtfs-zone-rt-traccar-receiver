@@ -18,6 +18,11 @@ log = logging.getLogger(__name__)
 REDIS_URL = os.environ["REDIS_URL"]
 DATABASE_URL = os.environ["DATABASE_URL"]
 HTTP_PORT = int(os.environ.get("HTTP_PORT", "8080"))
+# Redis key namespace for written positions. Defaults to the live "vehicle"
+# namespace that cafe-car reads. During Phase 4 dual-run, set this to a shadow
+# prefix (e.g. "shadow:vehicle") so the Traccar pipeline can run alongside the
+# live OwnTracks feed without clobbering the keys cafe-car serves from.
+KEY_PREFIX = os.environ.get("VEHICLE_KEY_PREFIX", "vehicle")
 
 KNOTS_TO_MS = 0.514444
 POSITION_TTL = 60
@@ -85,7 +90,7 @@ async def forward(request: Request) -> dict[str, str]:
     }
 
     device_slug = position.get("deviceId") or "traccar"
-    key = f"vehicle:{username}:{device_slug}"
+    key = f"{KEY_PREFIX}:{username}:{device_slug}"
     await app.state.redis.setex(key, POSITION_TTL, json.dumps(record))
     log.info(
         "Stored %s lat=%s lon=%s trip_id=%s",

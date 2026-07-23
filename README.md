@@ -38,7 +38,7 @@ are mapped as follows:
 | `position.speed` | `speed` | converted **knots → m/s** (×0.514444), 4 decimal places |
 | `position.fixTime` | `timestamp` | ISO-8601 parsed to epoch seconds |
 
-**Redis key:** `vehicle:{uniqueId}:{position.deviceId or "traccar"}` — overwritten on each update.
+**Redis key:** `{VEHICLE_KEY_PREFIX}:{uniqueId}:{position.deviceId or "traccar"}` (default prefix `vehicle`) — overwritten on each update.
 
 ---
 
@@ -49,6 +49,7 @@ are mapped as follows:
 | `REDIS_URL` | `redis://redis:6379/1` | Redis connection URL including DB number |
 | `DATABASE_URL` | `postgresql+psycopg2://.../postgres` | Postgres URL for driver-rule trip resolution |
 | `HTTP_PORT` | `8080` | Port the HTTP server listens on (default `8080`) |
+| `VEHICLE_KEY_PREFIX` | `vehicle` | Redis key namespace for written positions (default `vehicle`). Set to a shadow prefix (e.g. `shadow:vehicle`) for dual-run comparison so the Traccar pipeline doesn't clobber the live feed. |
 
 `REDIS_URL` and `DATABASE_URL` are required — the service exits with `KeyError` if either is missing.
 
