@@ -2,27 +2,36 @@ import asyncio
 import json
 import logging
 import os
-from urllib.parse import urlparse
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from datetime import datetime
 
-import aiomqtt
 import redis.asyncio as aioredis
-from sqlmodel import Session, create_engine
-
+import uvicorn
+from fastapi import FastAPI, Request
 from railroad_club.trip_resolver import resolve_driver_trip
+from sqlmodel import Session, create_engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-MQTT_BROKER = os.environ["MQTT_BROKER"]
-MQTT_USERNAME = os.environ.get("MQTT_USERNAME")
-MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD")
 REDIS_URL = os.environ["REDIS_URL"]
 DATABASE_URL = os.environ["DATABASE_URL"]
+HTTP_PORT = int(os.environ.get("HTTP_PORT", "8080"))
 
-RECONNECT_DELAY_INITIAL = 1
-RECONNECT_DELAY_MAX = 60
+KNOTS_TO_MS = 0.514444
+POSITION_TTL = 60
 
 _engine = create_engine(DATABASE_URL)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    app.state.redis = aioredis.from_url(REDIS_URL)
+    yield
+    await app.state.redis.aclose()
+
+
+app = FastAPI(title="vehicle-poser", lifespan=lifespan)
 
 
 def _resolve_trip(username: str) -> str | None:
@@ -30,67 +39,67 @@ def _resolve_trip(username: str) -> str | None:
         return resolve_driver_trip(username, session)
 
 
-async def process_messages(client: aiomqtt.Client, redis: aioredis.Redis) -> None:
-    await client.subscribe("owntracks/+/+")
-    async for message in client.messages:
-        try:
-            payload = json.loads(message.payload)
-        except (json.JSONDecodeError, ValueError):
-            log.warning("Failed to decode JSON from topic %s", message.topic)
-            continue
-
-        if payload.get("_type") != "location":
-            continue
-
-        parts = str(message.topic).split("/")
-        user = parts[1]
-        device = parts[2]
-
-        if device == "auto":
-            trip_id = await asyncio.to_thread(_resolve_trip, user)
-            if trip_id is None:
-                log.warning("No active rule for driver=%s (device=auto)", user)
-        else:
-            trip_id = device
-
-        record = {
-            "driver": user,
-            "trip_id": trip_id,
-            "lat": payload.get("lat"),
-            "lon": payload.get("lon"),
-            "bearing": payload.get("cog"),
-            "speed": round(payload["vel"] / 3.6, 4) if payload.get("vel") is not None else None,
-            "timestamp": payload.get("tst"),
-        }
-        key = f"vehicle:{user}:{device}"
-        await redis.setex(key, 60, json.dumps(record))
-        log.info("Stored %s lat=%s lon=%s trip_id=%s", key, record["lat"], record["lon"], trip_id)
+def _to_epoch(fix_time: object) -> int | None:
+    """Traccar sends fixTime as an ISO-8601 string; cafe-car needs epoch seconds."""
+    if fix_time is None:
+        return None
+    if isinstance(fix_time, int | float):
+        return int(fix_time)
+    try:
+        text = str(fix_time).replace("Z", "+00:00")
+        return int(datetime.fromisoformat(text).timestamp())
+    except (ValueError, TypeError):
+        log.warning("Could not parse fixTime %r", fix_time)
+        return None
 
 
-async def main() -> None:
-    parsed = urlparse(MQTT_BROKER)
-    host = parsed.hostname
-    port = parsed.port or 1883
+@app.get("/health")
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
 
-    redis = aioredis.from_url(REDIS_URL)
-    delay = RECONNECT_DELAY_INITIAL
 
-    while True:
-        try:
-            async with aiomqtt.Client(hostname=host, port=port, username=MQTT_USERNAME, password=MQTT_PASSWORD) as client:
-                log.info("Connected to MQTT broker %s:%s", host, port)
-                delay = RECONNECT_DELAY_INITIAL
-                await process_messages(client, redis)
-        except aiomqtt.MqttError as exc:
-            log.warning("MQTT error: %s — reconnecting in %ss", exc, delay)
-            await asyncio.sleep(delay)
-            delay = min(delay * 2, RECONNECT_DELAY_MAX)
-        except asyncio.CancelledError:
-            log.info("Shutting down")
-            break
+@app.post("/forward")
+async def forward(request: Request) -> dict[str, str]:
+    body = await request.json()
+    device = body.get("device") or {}
+    position = body.get("position") or {}
 
-    await redis.aclose()
+    username = device.get("uniqueId")
+    if not username:
+        log.warning("Forward payload missing device.uniqueId")
+        return {"status": "ignored"}
+
+    trip_id = await asyncio.to_thread(_resolve_trip, username)
+    if trip_id is None:
+        log.warning("No active rule for driver=%s", username)
+
+    speed = position.get("speed")
+    record = {
+        "driver": username,
+        "trip_id": trip_id,
+        "lat": position.get("latitude"),
+        "lon": position.get("longitude"),
+        "bearing": position.get("course"),
+        "speed": round(speed * KNOTS_TO_MS, 4) if speed is not None else None,
+        "timestamp": _to_epoch(position.get("fixTime")),
+    }
+
+    device_slug = position.get("deviceId") or "traccar"
+    key = f"vehicle:{username}:{device_slug}"
+    await app.state.redis.setex(key, POSITION_TTL, json.dumps(record))
+    log.info(
+        "Stored %s lat=%s lon=%s trip_id=%s",
+        key,
+        record["lat"],
+        record["lon"],
+        trip_id,
+    )
+    return {"status": "ok"}
+
+
+def main() -> None:
+    uvicorn.run(app, host="0.0.0.0", port=HTTP_PORT)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

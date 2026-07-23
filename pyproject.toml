@@ -2,9 +2,10 @@
 name = "vehicle-poser"
 version = "0.1.1"
 requires-python = ">=3.13"
-description = "Bridges OwnTracks MQTT location events to Redis"
+description = "Bridges Traccar HTTP position forwards to Redis"
 dependencies = [
-    "aiomqtt>=2.3",
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
     "psycopg2-binary>=2.9",
     "redis[hiredis]>=5.2",
     "sqlmodel>=0.0.21",

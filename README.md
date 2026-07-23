@@ -1,35 +1,44 @@
 # vehicle-poser
 
-Tiny async Python service that ingests [OwnTracks](https://owntracks.org/) location events via MQTT and writes normalized vehicle positions to Redis.
+Tiny async Python service that receives [Traccar](https://www.traccar.org/) position forwards over HTTP and writes normalized vehicle positions to Redis.
 
 Part of a larger stack; see [deploy-gtfs-rt](https://git.kcfam.us/gtfs.zone/deploy-gtfs-rt) for the full deployment.
 
 ### How it fits together
 
 ```
-OwnTracks app (phone)
-    └─> MQTT broker (see cafe-car)
-            └─> bridge service
-                    └─> Redis (vehicle:{username} keys, 60s TTL)
-                            └─> cafe-car (serves GTFS-RT feeds)
+Traccar Client app (phone)
+    └─> Traccar server (:5055 osmand ingest)
+            └─> forward.type=json  POST /forward
+                    └─> vehicle-poser (this service)
+                            └─> Redis (vehicle:{username}:{deviceId} keys, 60s TTL)
+                                    └─> cafe-car (serves GTFS-RT feeds)
 ```
 
-The bridge subscribes to `owntracks/+/+`, filters for `_type=location` events, transforms the payload to a normalized record, and writes it to Redis with a 60-second TTL. If the MQTT connection drops, it reconnects with exponential backoff (1s → 60s max).
+Traccar is configured with `forward.type=json` / `forward.url=http://vehicle-poser:8080/forward`.
+On each POST the service reads `device.uniqueId` (which is the driver's username),
+resolves the driver's active `trip_id` via railroad-club's schedule-based
+`resolve_driver_trip`, transforms the payload to a normalized record, and writes
+it to Redis with a 60-second TTL. The record shape is unchanged from the previous
+OwnTracks bridge, so cafe-car needs no changes.
 
 ---
 
 ## Payload transformation
 
-OwnTracks fields are mapped as follows:
+Traccar `json` forward sends `{"position": Position, "device": Device}`. Fields
+are mapped as follows:
 
-| OwnTracks field | Redis record field | Notes |
+| Traccar field | Redis record field | Notes |
 |---|---|---|
-| topic `owntracks/{user}/{device}` | `driver`, `trip_id` | split from topic |
-| `lat`, `lon`, `tst` | `lat`, `lon`, `timestamp` | passed through |
-| `cog` | `bearing` | degrees |
-| `vel` | `speed` | converted km/h → m/s, 4 decimal places |
+| `device.uniqueId` | `driver` | = driver username |
+| — | `trip_id` | resolved server-side via `resolve_driver_trip(username)` (schedule-based), or `null` |
+| `position.latitude`, `position.longitude` | `lat`, `lon` | passed through |
+| `position.course` | `bearing` | degrees |
+| `position.speed` | `speed` | converted **knots → m/s** (×0.514444), 4 decimal places |
+| `position.fixTime` | `timestamp` | ISO-8601 parsed to epoch seconds |
 
-**Redis key:** `vehicle:{username}` — one key per OwnTracks username, overwritten on each update.
+**Redis key:** `vehicle:{uniqueId}:{position.deviceId or "traccar"}` — overwritten on each update.
 
 ---
 
@@ -37,10 +46,11 @@ OwnTracks fields are mapped as follows:
 
 | Variable | Example | Description |
 |---|---|---|
-| `MQTT_BROKER` | `tcp://localhost:1883` | MQTT broker URL (tcp scheme) |
 | `REDIS_URL` | `redis://redis:6379/1` | Redis connection URL including DB number |
+| `DATABASE_URL` | `postgresql+psycopg2://.../postgres` | Postgres URL for driver-rule trip resolution |
+| `HTTP_PORT` | `8080` | Port the HTTP server listens on (default `8080`) |
 
-Both are required — the service exits with `KeyError` if either is missing.
+`REDIS_URL` and `DATABASE_URL` are required — the service exits with `KeyError` if either is missing.
 
 ---
 
@@ -53,8 +63,9 @@ uv sync
 # Install git hooks (required once per clone)
 uv run pre-commit install
 
-# Run locally (requires MQTT broker and Redis)
-MQTT_BROKER=tcp://localhost:1883 REDIS_URL=redis://localhost:6379/1 \
+# Run locally (requires Redis and Postgres)
+REDIS_URL=redis://localhost:6379/1 \
+DATABASE_URL=postgresql+psycopg2://postgres:mysecretpassword@localhost:5432/postgres \
   uv run python -m vehicle_poser.main
 
 # Build and push Docker image (requires clean, pushed git state)
@@ -66,16 +77,19 @@ make push
 ## Testing
 
 ```sh
-# Publish a location event (vel in km/h, cog in degrees)
-mosquitto_pub -t owntracks/alice/phone \
-  -m '{"_type":"location","lat":51.5,"lon":-0.1,"tst":1,"vel":36,"cog":90}'
+# Simulate a Traccar json forward (speed in knots, course in degrees)
+curl -X POST http://localhost:8080/forward \
+  -H 'Content-Type: application/json' \
+  -d '{"device":{"uniqueId":"alice"},
+       "position":{"latitude":51.5,"longitude":-0.1,"course":90,"speed":10,
+                   "fixTime":"2026-07-23T12:00:00Z","deviceId":7}}'
 
 # Verify the Redis key (use the DB set in REDIS_URL)
-redis-cli -n 1 GET vehicle:alice
+redis-cli -n 1 GET vehicle:alice:7
 ```
 
-Expected Redis value:
+Expected Redis value (`trip_id` is `null` unless `alice` has an active driver rule):
 
 ```json
-{"driver": "alice", "trip_id": "phone", "lat": 51.5, "lon": -0.1, "bearing": 90, "speed": 10.0, "timestamp": 1}
+{"driver": "alice", "trip_id": null, "lat": 51.5, "lon": -0.1, "bearing": 90, "speed": 5.1444, "timestamp": 1784808000}
 ```
