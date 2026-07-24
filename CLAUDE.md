@@ -4,34 +4,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Tiny async Python service that bridges OwnTracks MQTT location events to Redis. The entire service logic lives in `src/vehicle_poser/main.py`.
+Tiny async Python service that receives [Traccar](https://www.traccar.org/) position forwards over HTTP and writes normalized vehicle positions to Redis. The entire service logic lives in `src/vehicle_poser/main.py`.
 
 ## Architecture
 
-**Flow:** OwnTracks device → MQTT broker → bridge service → Redis
+**Flow:** Traccar Client app (phone) → Traccar server → HTTP `POST /forward` → this service → Redis → cafe-car
 
-1. `main()` connects to MQTT and Redis, then runs a reconnect loop with exponential backoff (1s → 60s max).
-2. `process_messages()` subscribes to `owntracks/+/+`, filters for `_type=location`, transforms the payload, and writes to Redis with a 60-second TTL via `setex`.
+1. `main()` runs a FastAPI/uvicorn HTTP server; Redis is opened in the `lifespan` and stored on `app.state.redis`.
+2. `POST /forward` receives Traccar's `json` forward (`{"device": Device, "position": Position}`), transforms the payload, resolves the trip, and writes to Redis with a 60-second TTL via `setex`. `GET /health` is a liveness probe.
 
-**Payload transformation** — OwnTracks fields are mapped to a normalized record:
-- Topic `owntracks/{user}/{device}` → `driver=user`, `trip_id=device`
-- `lat`, `lon`, `tst` (timestamp) passed through directly
-- `cog` → `bearing`
-- `vel` (km/h) → `speed` (m/s, rounded to 4 decimal places)
+**Payload transformation** — Traccar fields are mapped to a normalized record:
+- `device.uniqueId` → `tracker_id` (the tracker's **secret** id; never exposed in a public feed)
+- `trip_id` resolved server-side via `resolve_tracker_trip(tracker_id)` (schedule-based), or `null`
+- `position.latitude`, `position.longitude` → `lat`, `lon`
+- `position.course` → `bearing`
+- `position.speed` (knots) → `speed` (m/s, ×0.514444, 4 decimal places)
+- `position.fixTime` (ISO-8601) → `timestamp` (epoch seconds)
 
 **Redis key scheme:**
-- Key: `vehicle:{user}` (one per OwnTracks username)
-- Value: JSON of the normalized record (not raw OwnTracks payload)
+- Key: `{VEHICLE_KEY_PREFIX}:{tracker_id}:{position.deviceId or "traccar"}` (default prefix `vehicle`)
+- Value: JSON of the normalized record
 - TTL: 60 seconds
+
+cafe-car scans `vehicle:{tracker_id}:*` and labels the vehicle in the public GTFS-RT feed by the tracker's `nickname` (from the DB) — the `tracker_id` is a secret credential and stays internal to Redis.
 
 ## Environment Variables
 
 | Variable | Example | Description |
 |---|---|---|
-| `MQTT_BROKER` | `tcp://localhost:1883` | MQTT broker URL (tcp scheme, host, port) |
 | `REDIS_URL` | `redis://redis:6379/1` | Redis connection URL including DB number |
+| `DATABASE_URL` | `postgresql+psycopg2://.../postgres` | Postgres URL for tracker-rule trip resolution |
+| `HTTP_PORT` | `8080` | Port the HTTP server listens on (default `8080`) |
+| `VEHICLE_KEY_PREFIX` | `vehicle` | Redis key namespace for written positions (default `vehicle`) |
 
-Both are required — the service exits with `KeyError` if either is missing.
+`REDIS_URL` and `DATABASE_URL` are required — the service exits with `KeyError` if either is missing.
 
 ## Development
 
@@ -44,8 +50,10 @@ uv sync
 # Install git hooks (required once per clone)
 uv run pre-commit install
 
-# Run the service locally (requires MQTT broker and Redis)
-uv run python -m vehicle_poser.main
+# Run the service locally (requires Redis and Postgres)
+REDIS_URL=redis://localhost:6379/1 \
+DATABASE_URL=postgresql+psycopg2://postgres:mysecretpassword@localhost:5432/postgres \
+  uv run python -m vehicle_poser.main
 
 # Build and push Docker image (requires clean, pushed git state)
 make push
@@ -58,10 +66,13 @@ make push
 ## Testing
 
 ```sh
-# Publish a location event (vel in km/h, cog in degrees)
-mosquitto_pub -t owntracks/alice/phone \
-  -m '{"_type":"location","lat":51.5,"lon":-0.1,"tst":1,"vel":36,"cog":90}'
+# Simulate a Traccar json forward (speed in knots, course in degrees)
+curl -X POST http://localhost:8080/forward \
+  -H 'Content-Type: application/json' \
+  -d '{"device":{"uniqueId":"alice"},
+       "position":{"latitude":51.5,"longitude":-0.1,"course":90,"speed":10,
+                   "fixTime":"2026-07-23T12:00:00Z","deviceId":7}}'
 
-# Verify Redis key (use the DB set in REDIS_URL)
-redis-cli -n 1 GET vehicle:alice
+# Verify the Redis key (use the DB set in REDIS_URL)
+redis-cli -n 1 GET vehicle:alice:7
 ```

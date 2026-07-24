@@ -9,7 +9,7 @@ from datetime import datetime
 import redis.asyncio as aioredis
 import uvicorn
 from fastapi import FastAPI, Request
-from railroad_club.trip_resolver import resolve_driver_trip
+from railroad_club.trip_resolver import resolve_tracker_trip
 from sqlmodel import Session, create_engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -19,9 +19,9 @@ REDIS_URL = os.environ["REDIS_URL"]
 DATABASE_URL = os.environ["DATABASE_URL"]
 HTTP_PORT = int(os.environ.get("HTTP_PORT", "8080"))
 # Redis key namespace for written positions. Defaults to the live "vehicle"
-# namespace that cafe-car reads. During Phase 4 dual-run, set this to a shadow
-# prefix (e.g. "shadow:vehicle") so the Traccar pipeline can run alongside the
-# live OwnTracks feed without clobbering the keys cafe-car serves from.
+# namespace that cafe-car reads. Set this to a shadow prefix (e.g.
+# "shadow:vehicle") to run a second pipeline alongside the live feed without
+# clobbering the keys cafe-car serves from.
 KEY_PREFIX = os.environ.get("VEHICLE_KEY_PREFIX", "vehicle")
 
 KNOTS_TO_MS = 0.514444
@@ -39,9 +39,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="vehicle-poser", lifespan=lifespan)
 
 
-def _resolve_trip(username: str) -> str | None:
+def _resolve_trip(tracker_id: str) -> str | None:
     with Session(_engine) as session:
-        return resolve_driver_trip(username, session)
+        return resolve_tracker_trip(tracker_id, session)
 
 
 def _to_epoch(fix_time: object) -> int | None:
@@ -69,18 +69,18 @@ async def forward(request: Request) -> dict[str, str]:
     device = body.get("device") or {}
     position = body.get("position") or {}
 
-    username = device.get("uniqueId")
-    if not username:
+    tracker_id = device.get("uniqueId")
+    if not tracker_id:
         log.warning("Forward payload missing device.uniqueId")
         return {"status": "ignored"}
 
-    trip_id = await asyncio.to_thread(_resolve_trip, username)
+    trip_id = await asyncio.to_thread(_resolve_trip, tracker_id)
     if trip_id is None:
-        log.warning("No active rule for driver=%s", username)
+        log.warning("No active rule for tracker=%s", tracker_id)
 
     speed = position.get("speed")
     record = {
-        "driver": username,
+        "tracker_id": tracker_id,
         "trip_id": trip_id,
         "lat": position.get("latitude"),
         "lon": position.get("longitude"),
@@ -90,7 +90,7 @@ async def forward(request: Request) -> dict[str, str]:
     }
 
     device_slug = position.get("deviceId") or "traccar"
-    key = f"{KEY_PREFIX}:{username}:{device_slug}"
+    key = f"{KEY_PREFIX}:{tracker_id}:{device_slug}"
     await app.state.redis.setex(key, POSITION_TTL, json.dumps(record))
     log.info(
         "Stored %s lat=%s lon=%s trip_id=%s",

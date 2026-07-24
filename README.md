@@ -11,16 +11,16 @@ Traccar Client app (phone)
     └─> Traccar server (:5055 osmand ingest)
             └─> forward.type=json  POST /forward
                     └─> vehicle-poser (this service)
-                            └─> Redis (vehicle:{username}:{deviceId} keys, 60s TTL)
+                            └─> Redis (vehicle:{tracker_id}:{deviceId} keys, 60s TTL)
                                     └─> cafe-car (serves GTFS-RT feeds)
 ```
 
 Traccar is configured with `forward.type=json` / `forward.url=http://vehicle-poser:8080/forward`.
-On each POST the service reads `device.uniqueId` (which is the driver's username),
-resolves the driver's active `trip_id` via railroad-club's schedule-based
-`resolve_driver_trip`, transforms the payload to a normalized record, and writes
-it to Redis with a 60-second TTL. The record shape is unchanged from the previous
-OwnTracks bridge, so cafe-car needs no changes.
+On each POST the service reads `device.uniqueId` (which is the tracker's secret
+id), resolves the tracker's active `trip_id` via railroad-club's schedule-based
+`resolve_tracker_trip`, transforms the payload to a normalized record, and writes
+it to Redis with a 60-second TTL. cafe-car labels the vehicle in the public feed
+by the tracker's `nickname` (resolved from the DB), never by this secret id.
 
 ---
 
@@ -31,8 +31,8 @@ are mapped as follows:
 
 | Traccar field | Redis record field | Notes |
 |---|---|---|
-| `device.uniqueId` | `driver` | = driver username |
-| — | `trip_id` | resolved server-side via `resolve_driver_trip(username)` (schedule-based), or `null` |
+| `device.uniqueId` | `tracker_id` | = the tracker's secret id |
+| — | `trip_id` | resolved server-side via `resolve_tracker_trip(tracker_id)` (schedule-based), or `null` |
 | `position.latitude`, `position.longitude` | `lat`, `lon` | passed through |
 | `position.course` | `bearing` | degrees |
 | `position.speed` | `speed` | converted **knots → m/s** (×0.514444), 4 decimal places |
@@ -47,7 +47,7 @@ are mapped as follows:
 | Variable | Example | Description |
 |---|---|---|
 | `REDIS_URL` | `redis://redis:6379/1` | Redis connection URL including DB number |
-| `DATABASE_URL` | `postgresql+psycopg2://.../postgres` | Postgres URL for driver-rule trip resolution |
+| `DATABASE_URL` | `postgresql+psycopg2://.../postgres` | Postgres URL for tracker-rule trip resolution |
 | `HTTP_PORT` | `8080` | Port the HTTP server listens on (default `8080`) |
 | `VEHICLE_KEY_PREFIX` | `vehicle` | Redis key namespace for written positions (default `vehicle`). Set to a shadow prefix (e.g. `shadow:vehicle`) for dual-run comparison so the Traccar pipeline doesn't clobber the live feed. |
 
@@ -89,8 +89,8 @@ curl -X POST http://localhost:8080/forward \
 redis-cli -n 1 GET vehicle:alice:7
 ```
 
-Expected Redis value (`trip_id` is `null` unless `alice` has an active driver rule):
+Expected Redis value (`trip_id` is `null` unless tracker `alice` has an active rule):
 
 ```json
-{"driver": "alice", "trip_id": null, "lat": 51.5, "lon": -0.1, "bearing": 90, "speed": 5.1444, "timestamp": 1784808000}
+{"tracker_id": "alice", "trip_id": null, "lat": 51.5, "lon": -0.1, "bearing": 90, "speed": 5.1444, "timestamp": 1784808000}
 ```
