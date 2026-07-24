@@ -6,6 +6,8 @@ WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
+# railroad-club is a git dependency; uv needs git to fetch it.
+RUN apk add --no-cache git
 
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
