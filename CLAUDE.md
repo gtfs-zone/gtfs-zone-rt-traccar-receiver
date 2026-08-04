@@ -13,7 +13,7 @@ Tiny async Python service that receives [Traccar](https://www.traccar.org/) posi
 1. `main()` runs a FastAPI/uvicorn HTTP server; Redis is opened in the `lifespan` and stored on `app.state.redis`.
 2. `POST /forward` receives Traccar's `json` forward (`{"device": Device, "position": Position}`), transforms the payload, resolves the trip, and writes to Redis with a 60-second TTL via `setex`. `GET /health` is a liveness probe.
 
-**Payload transformation** — Traccar fields are mapped to a normalized record:
+**Payload transformation:** Traccar fields are mapped to a normalized record:
 - `device.uniqueId` → `tracker_id` (the tracker's **secret** id; never exposed in a public feed)
 - `trip_id` resolved server-side via `resolve_tracker_trip(tracker_id)` (schedule-based), or `null`
 - `position.latitude`, `position.longitude` → `lat`, `lon`
@@ -26,7 +26,7 @@ Tiny async Python service that receives [Traccar](https://www.traccar.org/) posi
 - Value: JSON of the normalized record
 - TTL: 60 seconds
 
-cafe-car scans `vehicle:{tracker_id}:*` and labels the vehicle in the public GTFS-RT feed by the tracker's `nickname` (from the DB) — the `tracker_id` is a secret credential and stays internal to Redis.
+cafe-car scans `vehicle:{tracker_id}:*` and labels the vehicle in the public GTFS-RT feed by the tracker's `nickname` (from the DB). The `tracker_id` is a secret credential and stays internal to Redis.
 
 ## Environment Variables
 
@@ -37,7 +37,7 @@ cafe-car scans `vehicle:{tracker_id}:*` and labels the vehicle in the public GTF
 | `HTTP_PORT` | `8080` | Port the HTTP server listens on (default `8080`) |
 | `VEHICLE_KEY_PREFIX` | `vehicle` | Redis key namespace for written positions (default `vehicle`) |
 
-`REDIS_URL` and `DATABASE_URL` are required — the service exits with `KeyError` if either is missing.
+`REDIS_URL` and `DATABASE_URL` are required. The service exits with `KeyError` if either is missing.
 
 ## Development
 

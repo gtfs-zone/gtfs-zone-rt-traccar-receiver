@@ -32,13 +32,13 @@ are mapped as follows:
 | Traccar field | Redis record field | Notes |
 |---|---|---|
 | `device.uniqueId` | `tracker_id` | = the tracker's secret id |
-| — | `trip_id` | resolved server-side via `resolve_tracker_trip(tracker_id)` (schedule-based), or `null` |
+| - | `trip_id` | resolved server-side via `resolve_tracker_trip(tracker_id)` (schedule-based), or `null` |
 | `position.latitude`, `position.longitude` | `lat`, `lon` | passed through |
 | `position.course` | `bearing` | degrees |
 | `position.speed` | `speed` | converted **knots → m/s** (×0.514444), 4 decimal places |
 | `position.fixTime` | `timestamp` | ISO-8601 parsed to epoch seconds |
 
-**Redis key:** `{VEHICLE_KEY_PREFIX}:{uniqueId}:{position.deviceId or "traccar"}` (default prefix `vehicle`) — overwritten on each update.
+**Redis key:** `{VEHICLE_KEY_PREFIX}:{uniqueId}:{position.deviceId or "traccar"}` (default prefix `vehicle`), overwritten on each update.
 
 ---
 
@@ -51,7 +51,7 @@ are mapped as follows:
 | `HTTP_PORT` | `8080` | Port the HTTP server listens on (default `8080`) |
 | `VEHICLE_KEY_PREFIX` | `vehicle` | Redis key namespace for written positions (default `vehicle`). Set to a shadow prefix (e.g. `shadow:vehicle`) for dual-run comparison so the Traccar pipeline doesn't clobber the live feed. |
 
-`REDIS_URL` and `DATABASE_URL` are required — the service exits with `KeyError` if either is missing.
+`REDIS_URL` and `DATABASE_URL` are required. The service exits with `KeyError` if either is missing.
 
 ---
 
