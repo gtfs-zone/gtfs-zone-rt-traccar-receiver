@@ -14,8 +14,9 @@ Tiny async Python service that receives [Traccar](https://www.traccar.org/) posi
 2. `POST /forward` receives Traccar's `json` forward (`{"device": Device, "position": Position}`), transforms the payload, resolves the trip, and writes to Redis with a 60-second TTL via `setex`. `GET /health` is a liveness probe.
 
 **Payload transformation:** Traccar fields are mapped to a normalized record:
-- `device.uniqueId` → `tracker_id` (the tracker's **secret** id; never exposed in a public feed)
-- `trip_id` resolved server-side via `resolve_tracker_trip(tracker_id)` (schedule-based), or `null`
+- `device.uniqueId` is the tracker's **secret** `device_key`. It is translated here and nowhere else: the record's `tracker_id` is the tracker's non-secret surrogate `id`.
+- `trip_id` resolved server-side via `resolve_tracker_trip(device_key)` (schedule-based), or `null`
+- `start_date` is the resolved run's service date (`YYYYMMDD`), or `null` alongside a `null` `trip_id`
 - `position.latitude`, `position.longitude` → `lat`, `lon`
 - `position.course` → `bearing`
 - `position.speed` (knots) → `speed` (m/s, ×0.514444, 4 decimal places)
@@ -26,7 +27,9 @@ Tiny async Python service that receives [Traccar](https://www.traccar.org/) posi
 - Value: JSON of the normalized record
 - TTL: 60 seconds
 
-cafe-car scans `vehicle:{tracker_id}:*` and labels the vehicle in the public GTFS-RT feed by the tracker's `nickname` (from the DB). The `tracker_id` is a secret credential and stays internal to Redis.
+cafe-car scans `vehicle:{tracker_id}:*` and labels the vehicle in the public GTFS-RT feed by the tracker's `nickname` (from the DB). `tracker_id` is the surrogate, not a credential; the credential is `device_key` and never leaves this service.
+
+An unknown `device.uniqueId` is dropped. A known tracker with no active rule is written with a `null` `trip_id` so it still draws as an unassigned vehicle.
 
 ## Environment Variables
 

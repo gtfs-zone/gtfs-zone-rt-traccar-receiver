@@ -9,7 +9,7 @@ from datetime import datetime
 import redis.asyncio as aioredis
 import uvicorn
 from fastapi import FastAPI, Request
-from railroad_club.trip_resolver import resolve_tracker_trip
+from railroad_club.trip_resolver import ResolvedTrip, resolve_tracker_trip
 from sqlmodel import Session, create_engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -29,6 +29,7 @@ POSITION_TTL = 60
 
 _engine = create_engine(DATABASE_URL)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.redis = aioredis.from_url(REDIS_URL)
@@ -39,9 +40,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="vehicle-poser", lifespan=lifespan)
 
 
-def _resolve_trip(tracker_id: str) -> str | None:
+def _resolve_trip(device_key: str) -> ResolvedTrip | None:
     with Session(_engine) as session:
-        return resolve_tracker_trip(tracker_id, session)
+        return resolve_tracker_trip(device_key, session)
 
 
 def _to_epoch(fix_time: object) -> int | None:
@@ -69,19 +70,36 @@ async def forward(request: Request) -> dict[str, str]:
     device = body.get("device") or {}
     position = body.get("position") or {}
 
-    tracker_id = device.get("uniqueId")
-    if not tracker_id:
+    # Traccar speaks the secret device key; nothing downstream does. This is
+    # the one edge that translates, and the resolver hands back the tracker's
+    # surrogate id along with the trip.
+    device_key = device.get("uniqueId")
+    if not device_key:
         log.warning("Forward payload missing device.uniqueId")
         return {"status": "ignored"}
 
-    trip_id = await asyncio.to_thread(_resolve_trip, tracker_id)
-    if trip_id is None:
-        log.warning("No active rule for tracker=%s", tracker_id)
+    resolved = await asyncio.to_thread(_resolve_trip, device_key)
+    if resolved is None:
+        # No such tracker, so no surrogate to key the record by and nothing to
+        # write. A tracker that exists but has no active rule is a different
+        # answer: it still gets a record, with no trip, and draws unmatched.
+        log.warning("No tracker for the posted device key")
+        return {"status": "ignored"}
+    if resolved.trip_id is None:
+        log.warning("No active rule for tracker=%s", resolved.tracker_id)
 
     speed = position.get("speed")
     record = {
-        "tracker_id": tracker_id,
-        "trip_id": trip_id,
+        "tracker_id": resolved.tracker_id,
+        "trip_id": resolved.trip_id,
+        # The service date the rule's window started on, which is what
+        # trip-updogger keys predictions by and cafe-car dedups vehicles by.
+        # None alongside a None trip_id: there is no run to date.
+        "start_date": (
+            resolved.service_date.strftime("%Y%m%d")
+            if resolved.service_date is not None
+            else None
+        ),
         "lat": position.get("latitude"),
         "lon": position.get("longitude"),
         "bearing": position.get("course"),
@@ -90,14 +108,15 @@ async def forward(request: Request) -> dict[str, str]:
     }
 
     device_slug = position.get("deviceId") or "traccar"
-    key = f"{KEY_PREFIX}:{tracker_id}:{device_slug}"
+    key = f"{KEY_PREFIX}:{resolved.tracker_id}:{device_slug}"
     await app.state.redis.setex(key, POSITION_TTL, json.dumps(record))
     log.info(
-        "Stored %s lat=%s lon=%s trip_id=%s",
+        "Stored %s lat=%s lon=%s trip_id=%s start_date=%s",
         key,
         record["lat"],
         record["lon"],
-        trip_id,
+        resolved.trip_id,
+        record["start_date"],
     )
     return {"status": "ok"}
 

@@ -16,11 +16,18 @@ Traccar Client app (phone)
 ```
 
 Traccar is configured with `forward.type=json` / `forward.url=http://vehicle-poser:8080/forward`.
-On each POST the service reads `device.uniqueId` (which is the tracker's secret
-id), resolves the tracker's active `trip_id` via railroad-club's schedule-based
-`resolve_tracker_trip`, transforms the payload to a normalized record, and writes
-it to Redis with a 60-second TTL. cafe-car labels the vehicle in the public feed
-by the tracker's `nickname` (resolved from the DB), never by this secret id.
+On each POST the service reads `device.uniqueId` (the tracker's secret
+`device_key`) and hands it to railroad-club's `resolve_tracker_trip`, which
+returns the tracker's non-secret surrogate `id`, its active `trip_id` and the
+service date that run started on. This is the only place the credential is
+spoken: every record and Redis key downstream uses the surrogate. The payload is
+transformed to a normalized record and written to Redis with a 60-second TTL.
+cafe-car labels the vehicle in the public feed by the tracker's `nickname`
+(resolved from the DB).
+
+A device key with no matching tracker is dropped. A tracker with no active rule
+is not: it gets a record with a `null` `trip_id`, which is what draws it as an
+unassigned vehicle rather than making it disappear.
 
 ---
 
@@ -31,14 +38,15 @@ are mapped as follows:
 
 | Traccar field | Redis record field | Notes |
 |---|---|---|
-| `device.uniqueId` | `tracker_id` | = the tracker's secret id |
-| - | `trip_id` | resolved server-side via `resolve_tracker_trip(tracker_id)` (schedule-based), or `null` |
+| `device.uniqueId` | `tracker_id` | translated: the posted value is the secret `device_key`, the record carries the tracker's surrogate `id` |
+| - | `trip_id` | resolved server-side via `resolve_tracker_trip(device_key)` (schedule-based), or `null` |
+| - | `start_date` | the resolved run's service date, `YYYYMMDD`, or `null` alongside a `null` `trip_id` |
 | `position.latitude`, `position.longitude` | `lat`, `lon` | passed through |
 | `position.course` | `bearing` | degrees |
 | `position.speed` | `speed` | converted **knots → m/s** (×0.514444), 4 decimal places |
 | `position.fixTime` | `timestamp` | ISO-8601 parsed to epoch seconds |
 
-**Redis key:** `{VEHICLE_KEY_PREFIX}:{uniqueId}:{position.deviceId or "traccar"}` (default prefix `vehicle`), overwritten on each update.
+**Redis key:** `{VEHICLE_KEY_PREFIX}:{tracker_id}:{position.deviceId or "traccar"}` (default prefix `vehicle`), keyed by the surrogate and overwritten on each update.
 
 ---
 
@@ -85,12 +93,15 @@ curl -X POST http://localhost:8080/forward \
        "position":{"latitude":51.5,"longitude":-0.1,"course":90,"speed":10,
                    "fixTime":"2026-07-23T12:00:00Z","deviceId":7}}'
 
-# Verify the Redis key (use the DB set in REDIS_URL)
-redis-cli -n 1 GET vehicle:alice:7
+# Verify the Redis key (use the DB set in REDIS_URL); the middle segment is
+# the tracker surrogate, so find it with a scan rather than guessing
+redis-cli -n 1 --scan --pattern "vehicle:*:7"
 ```
 
-Expected Redis value (`trip_id` is `null` unless tracker `alice` has an active rule):
+Expected Redis value (`trip_id` and `start_date` are `null` unless the tracker
+whose `device_key` is `alice` has an active rule; `tracker_id` is that tracker's
+surrogate id, not `alice`):
 
 ```json
-{"tracker_id": "alice", "trip_id": null, "lat": 51.5, "lon": -0.1, "bearing": 90, "speed": 5.1444, "timestamp": 1784808000}
+{"tracker_id": "0f0c1d...", "trip_id": null, "start_date": null, "lat": 51.5, "lon": -0.1, "bearing": 90, "speed": 5.1444, "timestamp": 1784808000}
 ```
