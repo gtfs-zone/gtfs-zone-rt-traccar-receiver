@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Overview
 
 Tiny async Python service that receives [Traccar](https://www.traccar.org/) position forwards over HTTP and writes normalized vehicle positions to Redis. The entire service logic lives in `src/vehicle_poser/main.py`.
@@ -61,10 +59,6 @@ DATABASE_URL=postgresql+psycopg2://postgres:mysecretpassword@localhost:5432/post
 # Build and push Docker image (requires clean, pushed git state)
 make push
 ```
-
-## Rules
-
-- Never add Co-Authored-By trailers to commit messages.
 
 ## Testing
 
