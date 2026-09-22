@@ -10,6 +10,7 @@ import redis.asyncio as aioredis
 import uvicorn
 from fastapi import FastAPI, Request
 from railroad_club.trip_resolver import ResolvedTrip, resolve_tracker_trip
+from railroad_club.vehicle_keys import vehicle_key
 from sqlmodel import Session, create_engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -21,7 +22,8 @@ HTTP_PORT = int(os.environ.get("HTTP_PORT", "8080"))
 # Redis key namespace for written positions. Defaults to the live "vehicle"
 # namespace that cafe-car reads. Set this to a shadow prefix (e.g.
 # "shadow:vehicle") to run a second pipeline alongside the live feed without
-# clobbering the keys cafe-car serves from.
+# clobbering the keys cafe-car serves from. The part after the prefix comes
+# from railroad-club, so it cannot drift from what cafe-car reads back.
 KEY_PREFIX = os.environ.get("VEHICLE_KEY_PREFIX", "vehicle")
 
 KNOTS_TO_MS = 0.514444
@@ -89,8 +91,13 @@ async def forward(request: Request) -> dict[str, str]:
         log.warning("No active rule for tracker=%s", resolved.tracker_id)
 
     speed = position.get("speed")
+    # Traccar's own device id names the vehicle in the published feed; without
+    # it the feed falls back to the tracker's nickname.
+    device_id = position.get("deviceId")
+    vehicle_id = str(device_id) if device_id is not None else None
     record = {
         "tracker_id": resolved.tracker_id,
+        "vehicle_id": vehicle_id,
         "trip_id": resolved.trip_id,
         # The service date the rule's window started on, which is what
         # trip-updogger keys predictions by and cafe-car dedups vehicles by.
@@ -107,8 +114,7 @@ async def forward(request: Request) -> dict[str, str]:
         "timestamp": _to_epoch(position.get("fixTime")),
     }
 
-    device_slug = position.get("deviceId") or "traccar"
-    key = f"{KEY_PREFIX}:{resolved.tracker_id}:{device_slug}"
+    key = f"{KEY_PREFIX}:{vehicle_key(resolved.tracker_id, vehicle_id)}"
     await app.state.redis.setex(key, POSITION_TTL, json.dumps(record))
     log.info(
         "Stored %s lat=%s lon=%s trip_id=%s start_date=%s",

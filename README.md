@@ -11,7 +11,7 @@ Traccar Client app (phone)
     └─> Traccar server (:5055 osmand ingest)
             └─> forward.type=json  POST /forward
                     └─> vehicle-poser (this service)
-                            └─> Redis (vehicle:{tracker_id}:{deviceId} keys, 60s TTL)
+                            └─> Redis (vehicle:{tracker_id}:{deviceId} keys, one per vehicle, 60s TTL)
                                     └─> cafe-car (serves GTFS-RT feeds)
 ```
 
@@ -103,5 +103,5 @@ whose `device_key` is `alice` has an active rule; `tracker_id` is that tracker's
 surrogate id, not `alice`):
 
 ```json
-{"tracker_id": "0f0c1d...", "trip_id": null, "start_date": null, "lat": 51.5, "lon": -0.1, "bearing": 90, "speed": 5.1444, "timestamp": 1784808000}
+{"tracker_id": "0f0c1d...", "vehicle_id": "7", "trip_id": null, "start_date": null, "lat": 51.5, "lon": -0.1, "bearing": 90, "speed": 5.1444, "timestamp": 1784808000}
 ```

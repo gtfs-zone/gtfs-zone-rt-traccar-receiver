@@ -21,11 +21,13 @@ Tiny async Python service that receives [Traccar](https://www.traccar.org/) posi
 - `position.fixTime` (ISO-8601) → `timestamp` (epoch seconds)
 
 **Redis key scheme:**
-- Key: `{VEHICLE_KEY_PREFIX}:{tracker_id}:{position.deviceId or "traccar"}` (default prefix `vehicle`)
+- Key: `{VEHICLE_KEY_PREFIX}:{tracker_id}:{position.deviceId}` (default prefix
+  `vehicle`), built by `railroad_club.vehicle_keys.vehicle_key`. A position
+  with no `deviceId` keys on the bare `tracker_id`.
 - Value: JSON of the normalized record
 - TTL: 60 seconds
 
-cafe-car scans `vehicle:{tracker_id}:*` and labels the vehicle in the public GTFS-RT feed by the tracker's `nickname` (from the DB). `tracker_id` is the surrogate, not a credential; the credential is `device_key` and never leaves this service.
+The key identifies a *vehicle*, not a trip: a device that changes trip overwrites its own record. cafe-car labels the vehicle in the public GTFS-RT feed by the record's `vehicle_id` (the Traccar `deviceId`), falling back to the tracker's `nickname` from the DB. `tracker_id` is the surrogate, not a credential; the credential is `device_key` and never leaves this service.
 
 An unknown `device.uniqueId` is dropped. A known tracker with no active rule is written with a `null` `trip_id` so it still draws as an unassigned vehicle.
 
