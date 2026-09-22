@@ -34,7 +34,7 @@ target-version = "py313"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "TCH", "RUF"]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "TC", "RUF"]
 
 [tool.commitizen]
 name = "cz_conventional_commits"

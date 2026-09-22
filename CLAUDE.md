@@ -58,8 +58,9 @@ REDIS_URL=redis://localhost:6379/1 \
 DATABASE_URL=postgresql+psycopg2://postgres:mysecretpassword@localhost:5432/postgres \
   uv run python -m vehicle_poser.main
 
-# Build and push Docker image (requires clean, pushed git state)
-make push
+# Build and push are CI's job: pushing to main publishes :latest and :<short-sha>.
+# `make cp` copies that short sha for the deploy-gtfs-rt manifest bump.
+make cp
 ```
 
 ## Testing
@@ -75,3 +76,7 @@ curl -X POST http://localhost:8080/forward \
 # Verify the Redis key (use the DB set in REDIS_URL)
 redis-cli -n 1 GET vehicle:alice:7
 ```
+
+## Rules
+
+- Module loggers are named `log`, never `logger`: `log = logging.getLogger(__name__)`
