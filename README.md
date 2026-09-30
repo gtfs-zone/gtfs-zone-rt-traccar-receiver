@@ -2,7 +2,7 @@
 
 Tiny async Python service that receives [Traccar](https://www.traccar.org/) position forwards over HTTP and writes normalized vehicle positions to Redis.
 
-Part of a larger stack; see [deploy-gtfs-rt](https://git.kcfam.us/gtfs.zone/deploy-gtfs-rt) for the full deployment.
+Part of a larger stack; see [deploy-gtfs-rt](https://github.com/gtfs-zone/deploy-gtfs-rt) for the full deployment.
 
 ### How it fits together
 
