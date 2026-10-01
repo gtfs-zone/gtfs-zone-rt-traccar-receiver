@@ -77,9 +77,7 @@ REDIS_URL=redis://localhost:6379/1 \
 DATABASE_URL=postgresql+psycopg2://postgres:mysecretpassword@localhost:5432/postgres \
   uv run python -m gtfs_zone_rt_traccar_receiver.main
 
-# Build and push are CI's job: pushing to main publishes :latest and :<short-sha>.
-# `make cp` copies that short sha for the gtfs-zone-infra manifest bump.
-make cp
+# Build and push are CI's job: a v* tag publishes :vX.Y.Z and :latest.
 ```
 
 ---

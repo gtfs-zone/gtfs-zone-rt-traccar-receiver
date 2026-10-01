@@ -1,8 +1,8 @@
 # AGENTS.md
 
 Tiny FastAPI service that receives Traccar position forwards on `POST /forward`
-and writes normalized vehicle positions to Redis for rt-api. Pushing to `main`
-publishes the image; `make cp` copies the short sha for the gtfs-zone-infra bump.
+and writes normalized vehicle positions to Redis for rt-api. A `v*` tag
+publishes the image; gtfs-zone-infra pins that tag.
 
 ## Architecture
 
