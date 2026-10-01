@@ -1,0 +1,45 @@
+publiccodeYmlVersion: "0.4"
+
+name: GTFS.zone RT Traccar Receiver
+url: "https://github.com/gtfs-zone/gtfs-zone-rt-traccar-receiver"
+
+platforms:
+  - linux
+
+categories:
+  - fleet-management
+  - data-collection
+
+developmentStatus: beta
+
+softwareType: "standalone/backend"
+
+description:
+  en:
+    shortDescription: >
+      A service that receives Traccar position forwards and writes vehicle positions to Redis.
+    longDescription: >
+      GTFS.zone RT Traccar Receiver accepts the JSON position forwards of a
+      Traccar server, resolves each device key to its gtfs.zone tracker and
+      active trip, and writes a normalized vehicle position to Redis with a
+      short TTL. gtfs-zone-rt-api serves those positions as GTFS Realtime. The
+      device key is never stored downstream: every record uses the tracker's
+      surrogate id.
+    features:
+      - Traccar JSON forward endpoint
+      - Device key to tracker and trip resolution
+      - Normalized vehicle positions in Redis
+
+legal:
+  license: AGPL-3.0-or-later
+
+maintenance:
+  type: community
+  contacts:
+    - name: Max Katz-Christy
+      email: maxkatzchristy@gmail.com
+
+localisation:
+  localisationReady: false
+  availableLanguages:
+    - en
