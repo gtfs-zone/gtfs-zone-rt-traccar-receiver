@@ -1,6 +1,6 @@
 [project]
 name = "gtfs-zone-rt-traccar-receiver"
-version = "0.2.1"
+version = "0.2.2"
 requires-python = ">=3.13"
 description = "Bridges Traccar HTTP position forwards to Redis"
 license = "AGPL-3.0-or-later"
