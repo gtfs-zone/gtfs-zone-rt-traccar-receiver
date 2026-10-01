@@ -2,11 +2,11 @@
 
 ## Overview
 
-Tiny async Python service that receives [Traccar](https://www.traccar.org/) position forwards over HTTP and writes normalized vehicle positions to Redis. The entire service logic lives in `src/vehicle_poser/main.py`.
+Tiny async Python service that receives [Traccar](https://www.traccar.org/) position forwards over HTTP and writes normalized vehicle positions to Redis. The entire service logic lives in `src/gtfs_zone_rt_traccar_receiver/main.py`.
 
 ## Architecture
 
-**Flow:** Traccar Client app (phone) → Traccar server → HTTP `POST /forward` → this service → Redis → cafe-car
+**Flow:** Traccar Client app (phone) → Traccar server → HTTP `POST /forward` → this service → Redis → rt-api
 
 1. `main()` runs a FastAPI/uvicorn HTTP server; Redis is opened in the `lifespan` and stored on `app.state.redis`.
 2. `POST /forward` receives Traccar's `json` forward (`{"device": Device, "position": Position}`), transforms the payload, resolves the trip, and writes to Redis with a 60-second TTL via `setex`. `GET /health` is a liveness probe.
@@ -22,12 +22,12 @@ Tiny async Python service that receives [Traccar](https://www.traccar.org/) posi
 
 **Redis key scheme:**
 - Key: `{VEHICLE_KEY_PREFIX}:{tracker_id}:{position.deviceId}` (default prefix
-  `vehicle`), built by `railroad_club.vehicle_keys.vehicle_key`. A position
+  `vehicle`), built by `gtfs_zone_db_models.vehicle_keys.vehicle_key`. A position
   with no `deviceId` keys on the bare `tracker_id`.
 - Value: JSON of the normalized record
 - TTL: 60 seconds
 
-The key identifies a *vehicle*, not a trip: a device that changes trip overwrites its own record. cafe-car labels the vehicle in the public GTFS-RT feed by the record's `vehicle_id` (the Traccar `deviceId`), falling back to the tracker's `nickname` from the DB. `tracker_id` is the surrogate, not a credential; the credential is `device_key` and never leaves this service.
+The key identifies a *vehicle*, not a trip: a device that changes trip overwrites its own record. rt-api labels the vehicle in the public GTFS-RT feed by the record's `vehicle_id` (the Traccar `deviceId`), falling back to the tracker's `nickname` from the DB. `tracker_id` is the surrogate, not a credential; the credential is `device_key` and never leaves this service.
 
 An unknown `device.uniqueId` is dropped. A known tracker with no active rule is written with a `null` `trip_id` so it still draws as an unassigned vehicle.
 
@@ -56,10 +56,10 @@ uv run pre-commit install
 # Run the service locally (requires Redis and Postgres)
 REDIS_URL=redis://localhost:6379/1 \
 DATABASE_URL=postgresql+psycopg2://postgres:mysecretpassword@localhost:5432/postgres \
-  uv run python -m vehicle_poser.main
+  uv run python -m gtfs_zone_rt_traccar_receiver.main
 
 # Build and push are CI's job: pushing to main publishes :latest and :<short-sha>.
-# `make cp` copies that short sha for the deploy-gtfs-rt manifest bump.
+# `make cp` copies that short sha for the gtfs-zone-infra manifest bump.
 make cp
 ```
 

@@ -6,7 +6,7 @@ WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
-# railroad-club is a git dependency; uv needs git to fetch it.
+# gtfs-zone-db-models is a git dependency; uv needs git to fetch it.
 RUN apk add --no-cache git
 
 COPY pyproject.toml uv.lock ./
@@ -39,5 +39,5 @@ RUN mkdir -p /app/beat && chown bridge:bridge /app/beat
 USER bridge
 
 
-CMD ["python", "-m", "vehicle_poser.main"]
+CMD ["python", "-m", "gtfs_zone_rt_traccar_receiver.main"]
 

@@ -9,8 +9,8 @@ from datetime import datetime
 import redis.asyncio as aioredis
 import uvicorn
 from fastapi import FastAPI, Request
-from railroad_club.trip_resolver import ResolvedTrip, resolve_tracker_trip
-from railroad_club.vehicle_keys import vehicle_key
+from gtfs_zone_db_models.trip_resolver import ResolvedTrip, resolve_tracker_trip
+from gtfs_zone_db_models.vehicle_keys import vehicle_key
 from sqlmodel import Session, create_engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -20,10 +20,10 @@ REDIS_URL = os.environ["REDIS_URL"]
 DATABASE_URL = os.environ["DATABASE_URL"]
 HTTP_PORT = int(os.environ.get("HTTP_PORT", "8080"))
 # Redis key namespace for written positions. Defaults to the live "vehicle"
-# namespace that cafe-car reads. Set this to a shadow prefix (e.g.
+# namespace that rt-api reads. Set this to a shadow prefix (e.g.
 # "shadow:vehicle") to run a second pipeline alongside the live feed without
-# clobbering the keys cafe-car serves from. The part after the prefix comes
-# from railroad-club, so it cannot drift from what cafe-car reads back.
+# clobbering the keys rt-api serves from. The part after the prefix comes
+# from gtfs-zone-db-models, so it cannot drift from what rt-api reads back.
 KEY_PREFIX = os.environ.get("VEHICLE_KEY_PREFIX", "vehicle")
 
 KNOTS_TO_MS = 0.514444
@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await app.state.redis.aclose()
 
 
-app = FastAPI(title="vehicle-poser", lifespan=lifespan)
+app = FastAPI(title="rt-traccar-receiver", lifespan=lifespan)
 
 
 def _resolve_trip(device_key: str) -> ResolvedTrip | None:
@@ -48,7 +48,7 @@ def _resolve_trip(device_key: str) -> ResolvedTrip | None:
 
 
 def _to_epoch(fix_time: object) -> int | None:
-    """Traccar sends fixTime as an ISO-8601 string; cafe-car needs epoch seconds."""
+    """Traccar sends fixTime as an ISO-8601 string; rt-api needs epoch seconds."""
     if fix_time is None:
         return None
     if isinstance(fix_time, int | float):
@@ -100,7 +100,7 @@ async def forward(request: Request) -> dict[str, str]:
         "vehicle_id": vehicle_id,
         "trip_id": resolved.trip_id,
         # The service date the rule's window started on, which is what
-        # trip-updogger keys predictions by and cafe-car dedups vehicles by.
+        # rt-delay-estimator keys predictions by and rt-api dedups vehicles by.
         # None alongside a None trip_id: there is no run to date.
         "start_date": (
             resolved.service_date.strftime("%Y%m%d")

@@ -1,8 +1,8 @@
-# vehicle-poser
+# gtfs-zone-rt-traccar-receiver
 
 Tiny async Python service that receives [Traccar](https://www.traccar.org/) position forwards over HTTP and writes normalized vehicle positions to Redis.
 
-Part of a larger stack; see [deploy-gtfs-rt](https://github.com/gtfs-zone/deploy-gtfs-rt) for the full deployment.
+Part of a larger stack; see [gtfs-zone-infra](https://github.com/gtfs-zone/gtfs-zone-infra) for the full deployment.
 
 ### How it fits together
 
@@ -10,19 +10,19 @@ Part of a larger stack; see [deploy-gtfs-rt](https://github.com/gtfs-zone/deploy
 Traccar Client app (phone)
     └─> Traccar server (:5055 osmand ingest)
             └─> forward.type=json  POST /forward
-                    └─> vehicle-poser (this service)
+                    └─> rt-traccar-receiver (this service)
                             └─> Redis (vehicle:{tracker_id}:{deviceId} keys, one per vehicle, 60s TTL)
-                                    └─> cafe-car (serves GTFS-RT feeds)
+                                    └─> rt-api (serves GTFS-RT feeds)
 ```
 
-Traccar is configured with `forward.type=json` / `forward.url=http://vehicle-poser:8080/forward`.
+Traccar is configured with `forward.type=json` / `forward.url=http://rt-traccar-receiver:8080/forward`.
 On each POST the service reads `device.uniqueId` (the tracker's secret
-`device_key`) and hands it to railroad-club's `resolve_tracker_trip`, which
+`device_key`) and hands it to gtfs-zone-db-models's `resolve_tracker_trip`, which
 returns the tracker's non-secret surrogate `id`, its active `trip_id` and the
 service date that run started on. This is the only place the credential is
 spoken: every record and Redis key downstream uses the surrogate. The payload is
 transformed to a normalized record and written to Redis with a 60-second TTL.
-cafe-car labels the vehicle in the public feed by the tracker's `nickname`
+rt-api labels the vehicle in the public feed by the tracker's `nickname`
 (resolved from the DB).
 
 A device key with no matching tracker is dropped. A tracker with no active rule
@@ -75,10 +75,10 @@ uv run pre-commit install
 # Run locally (requires Redis and Postgres)
 REDIS_URL=redis://localhost:6379/1 \
 DATABASE_URL=postgresql+psycopg2://postgres:mysecretpassword@localhost:5432/postgres \
-  uv run python -m vehicle_poser.main
+  uv run python -m gtfs_zone_rt_traccar_receiver.main
 
 # Build and push are CI's job: pushing to main publishes :latest and :<short-sha>.
-# `make cp` copies that short sha for the deploy-gtfs-rt manifest bump.
+# `make cp` copies that short sha for the gtfs-zone-infra manifest bump.
 make cp
 ```
 

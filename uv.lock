@@ -296,6 +296,56 @@ wheels = [
 ]
 
 [[package]]
+name = "gtfs-zone-db-models"
+version = "0.2.0"
+source = { git = "https://github.com/gtfs-zone/gtfs-zone-db-models.git?tag=v0.2.0#043c24bab0896a846406c7ccc3d7d9a8592ba7c1" }
+dependencies = [
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "boto3" },
+    { name = "petname" },
+    { name = "pydantic-settings" },
+    { name = "sqlmodel" },
+]
+
+[[package]]
+name = "gtfs-zone-rt-traccar-receiver"
+version = "0.1.1"
+source = { editable = "." }
+dependencies = [
+    { name = "fastapi" },
+    { name = "gtfs-zone-db-models" },
+    { name = "psycopg2-binary" },
+    { name = "redis", extra = ["hiredis"] },
+    { name = "sqlmodel" },
+    { name = "uvicorn" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "commitizen" },
+    { name = "pre-commit" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "gtfs-zone-db-models", git = "https://github.com/gtfs-zone/gtfs-zone-db-models.git?tag=v0.2.0" },
+    { name = "psycopg2-binary", specifier = ">=2.9" },
+    { name = "redis", extras = ["hiredis"], specifier = ">=5.2" },
+    { name = "sqlmodel", specifier = ">=0.0.21" },
+    { name = "uvicorn", specifier = ">=0.34" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "commitizen" },
+    { name = "pre-commit" },
+    { name = "ruff" },
+]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -716,19 +766,6 @@ wheels = [
 ]
 
 [[package]]
-name = "railroad-club"
-version = "0.1.0"
-source = { git = "https://github.com/gtfs-zone/railroad-club.git#647f187940e698cf7d507c3250e39511d9d5d9b9" }
-dependencies = [
-    { name = "alembic" },
-    { name = "asyncpg" },
-    { name = "boto3" },
-    { name = "petname" },
-    { name = "pydantic-settings" },
-    { name = "sqlmodel" },
-]
-
-[[package]]
 name = "redis"
 version = "7.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -912,43 +949,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a2/65/b7c6c443ccc58678c91e1e973bbe2a878591538655d6e1d47f24ba1c51f3/uvicorn-0.51.0.tar.gz", hash = "sha256:f6f4b69b657c312f516dd2d268ab9ae6f254b11e4bac504f37b2ab58b24dd0b0", size = 94412, upload-time = "2026-07-08T10:59:05.962Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/45/ec/dbb7e5a6b91f86bfb9eb7d2988a2730907b6a729875b949c7f022e8b88fa/uvicorn-0.51.0-py3-none-any.whl", hash = "sha256:5d38af6cd620f2ae3849fb44fd4879e0890aa1febe8d47eb355fb45d93fe6a5b", size = 73219, upload-time = "2026-07-08T10:59:04.44Z" },
-]
-
-[[package]]
-name = "vehicle-poser"
-version = "0.1.1"
-source = { editable = "." }
-dependencies = [
-    { name = "fastapi" },
-    { name = "psycopg2-binary" },
-    { name = "railroad-club" },
-    { name = "redis", extra = ["hiredis"] },
-    { name = "sqlmodel" },
-    { name = "uvicorn" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "commitizen" },
-    { name = "pre-commit" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "psycopg2-binary", specifier = ">=2.9" },
-    { name = "railroad-club", git = "https://github.com/gtfs-zone/railroad-club.git" },
-    { name = "redis", extras = ["hiredis"], specifier = ">=5.2" },
-    { name = "sqlmodel", specifier = ">=0.0.21" },
-    { name = "uvicorn", specifier = ">=0.34" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "commitizen" },
-    { name = "pre-commit" },
-    { name = "ruff" },
 ]
 
 [[package]]
