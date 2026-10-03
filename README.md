@@ -1,5 +1,7 @@
 # gtfs-zone-rt-traccar-receiver
 
+[![CI](https://img.shields.io/github/actions/workflow/status/gtfs-zone/gtfs-zone-rt-traccar-receiver/check.yml?branch=main&label=CI)](https://github.com/gtfs-zone/gtfs-zone-rt-traccar-receiver/actions/workflows/check.yml?query=branch%3Amain) [![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)](LICENSE.txt) [![Container image](https://img.shields.io/badge/image-ghcr.io-blue?logo=docker&logoColor=white)](https://github.com/gtfs-zone/gtfs-zone-rt-traccar-receiver/pkgs/container/gtfs-zone-rt-traccar-receiver)
+
 Tiny async Python service that receives [Traccar](https://www.traccar.org/) position forwards over HTTP and writes normalized vehicle positions to Redis.
 
 Part of a larger stack; see [gtfs-zone-infra](https://github.com/gtfs-zone/gtfs-zone-infra) for the full deployment.
